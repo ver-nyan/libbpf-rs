@@ -500,6 +500,7 @@ pub enum ProgramType {
     Lsm = libbpf_sys::BPF_PROG_TYPE_LSM,
     SkLookup = libbpf_sys::BPF_PROG_TYPE_SK_LOOKUP,
     Syscall = libbpf_sys::BPF_PROG_TYPE_SYSCALL,
+    Netfilter = libbpf_sys::BPF_PROG_TYPE_NETFILTER,
     /// See [`MapType::Unknown`][crate::MapType::Unknown]
     Unknown = u32::MAX,
 }
@@ -571,6 +572,7 @@ impl From<u32> for ProgramType {
             x if x == Lsm as u32 => Lsm,
             x if x == SkLookup as u32 => SkLookup,
             x if x == Syscall as u32 => Syscall,
+            x if x == Netfilter as u32 => Netfilter,
             _ => Unknown,
         }
     }
@@ -1744,6 +1746,7 @@ mod tests {
             Lsm,
             SkLookup,
             Syscall,
+            Netfilter,
             Unknown,
         ] {
             // check if discriminants match after a roundtrip conversion

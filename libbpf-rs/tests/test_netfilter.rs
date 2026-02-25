@@ -66,6 +66,10 @@ fn test_attach_and_detach(obj: &mut Object, protocol_family: i32, hooknum: i32, 
 fn test_netfilter() {
     let mut obj = get_test_object("netfilter.bpf.o");
 
+    for prog in obj.progs() {
+        assert_eq!(prog.prog_type(), libbpf_rs::ProgramType::Netfilter);
+    }
+
     // We don't test all hooks here, because support for some may be
     // more limited.
 
