@@ -246,37 +246,12 @@ impl<'fd> CgroupIterOpts<'fd> {
 #[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum IterOpts<'fd> {
+    /// No options used.
+    None,
     /// Iterate over a map.
     Map(MapIterOpts<'fd>),
     /// Iterate over a group.
     Cgroup(CgroupIterOpts<'fd>),
-}
-
-impl From<IterOpts<'_>> for libbpf_sys::bpf_iter_link_info {
-    fn from(opts: IterOpts) -> Self {
-        let mut linkinfo = Self::default();
-        match opts {
-            IterOpts::Map(map_opts) => {
-                let MapIterOpts {
-                    fd,
-                    _non_exhaustive: (),
-                } = map_opts;
-
-                linkinfo.map.map_fd = fd.as_raw_fd() as _;
-            }
-            IterOpts::Cgroup(cgroup_opts) => {
-                let CgroupIterOpts {
-                    fd,
-                    order,
-                    _non_exhaustive: (),
-                } = cgroup_opts;
-
-                linkinfo.cgroup.cgroup_fd = fd.as_raw_fd() as _;
-                linkinfo.cgroup.order = order as libbpf_sys::bpf_cgroup_iter_order;
-            }
-        };
-        linkinfo
-    }
 }
 
 
@@ -1582,10 +1557,29 @@ impl<'obj> ProgramMut<'obj> {
     ///
     /// The entry point of the program must be defined with `SEC("iter")` or `SEC("iter.s")`.
     pub fn attach_iter_with_opts(&self, opts: IterOpts<'_>) -> Result<Link> {
-        let mut linkinfo = libbpf_sys::bpf_iter_link_info::from(opts);
+        // SAFTEY: All-zero byte pattern valid for repr(C) struct
+        let mut linkinfo: libbpf_sys::bpf_iter_link_info = unsafe { mem::zeroed() };
+        let (linkinfo_ptr, linkinfo_len) = match &opts {
+            IterOpts::None => (ptr::null_mut(), 0),
+            IterOpts::Map(_) | IterOpts::Cgroup(_) => (
+                &raw mut linkinfo,
+                size_of::<libbpf_sys::bpf_iter_link_info>() as _,
+            ),
+        };
+        match opts {
+            IterOpts::Map(map_opts) => {
+                linkinfo.map.map_fd = map_opts.fd.as_raw_fd() as _;
+            }
+            IterOpts::Cgroup(cgroup_opts) => {
+                linkinfo.cgroup.order = cgroup_opts.order as libbpf_sys::bpf_cgroup_iter_order;
+                linkinfo.cgroup.cgroup_fd = cgroup_opts.fd.as_raw_fd() as _;
+            }
+            _ => {}
+        }
+
         let attach_opt = libbpf_sys::bpf_iter_attach_opts {
-            link_info: &raw mut linkinfo,
-            link_info_len: size_of::<libbpf_sys::bpf_iter_link_info>() as _,
+            link_info: linkinfo_ptr,
+            link_info_len: linkinfo_len,
             sz: size_of::<libbpf_sys::bpf_iter_attach_opts>() as _,
             ..Default::default()
         };
